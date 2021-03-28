@@ -29,7 +29,7 @@ function displaynamechoice {
   Read-Host = "1. To display as Adrian Stefaniak"
   Read-Host = "2. To display as Adures"
   Read-Host = "To display as emai for example wordpress@lagit.pl displays as Wordpress"
-  Read-Host = "test"
+  Read-Host = "test2"
 
 }
 
