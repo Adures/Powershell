@@ -1,6 +1,6 @@
 Import-module ExchangeOnlineManagement
 Import-module MSonline
-
+test from new device
 $path = "C:\Apps\adminemail.txt"
 if (Test-Path $path) {
     $Adminemail = Get-Content $Path
