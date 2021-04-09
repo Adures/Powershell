@@ -1,11 +1,12 @@
 Import-module ExchangeOnlineManagement
-Import-module MSonline
-test from new device
+Import-module PnP.PowerShell
+
 $path = "C:\Apps\adminemail.txt"
 if (Test-Path $path) {
     $Adminemail = Get-Content $Path
    #Connect-MsolService 
-   Connect-SPOService -url https://onlinelagit-admin.sharepoint.com
+    Connect-PnPOnline https://onlinelagit.sharepoint.com/sites/lagit -interactive
+
      Connect-ExchangeOnline -userPrincipalNAme $Adminemail -ShowProgress $True
     
 } else {
@@ -19,17 +20,30 @@ if (Test-Path $path) {
 }
 
 
-function createmailbox ($mailbox, $displayname) {
-  $adrian = "put your email address here"
-  $lagit  = "@lagit.pl"
-  $lowLetterMailbox = $mailbox.ToLower()
-  $primarysmtp = $lowLetterMailbox + $lagit
+function createmailbox ($mailbox, $displayname, $primarysmtp) {
+  $adrian = "here_was_my_email"
+  
+
   New-Mailbox -Name $mailbox -displayname $displayname -Shared -PrimarySmtpAddress $primarysmtp
   
   Add-RecipientPermission -Identity $primarysmtp -Trustee $adrian -AccessRights SendAs
   Set-Mailbox -Identity $primarysmtp -DeliverToMailboxAndForward $true -ForwardingSMTPAddress $adrian
 
+ return $primarysmtp
 
+}
+
+function createprimarysmtp ($mailbox) {
+
+  $lagit  = "@lagit.pl"
+  $lowLetterMailbox = $mailbox.ToLower()
+  $primarysmtp = $lowLetterMailbox + $lagit
+  return $primarysmtp
+}
+
+function createnewlistrecord ($mailbox, $displayname, $primarysmtp, $date) {
+
+  $updateditem = Add-PnPListItem -List "Email List" -Values @{"Title" = $primarysmtp; "Name" = $mailbox; "DisplayName" = $displayname; "Creationdate" = $date}
 
 }
 
@@ -76,7 +90,7 @@ function Main-Menu {
 Write-Host "================== $Title ==================="  -BackgroundColor DarkGreen
    
 Write-Host "1: Create new shared mailbox with forwarding"
-Write-Host "2: Placeholder"
+Write-Host "2: Placeholder for future options"
 
 
 $selection = Read-Host "Please make a selection"
@@ -84,12 +98,35 @@ $selection = Read-Host "Please make a selection"
      {
          '1' {
 
-            $mailbox = read-host "Please provide an email address for the mailbox that you want to create"
+            $mailbox = read-host "Please provide an email address for the mailbox that you want to create (without @lagit.pl)"
+            $primarysmtp =  createprimarysmtp $mailbox
             $displayname = displaynamechoice
-            createmailbox $mailbox $displayname
+            createmailbox $mailbox $displayname $primarysmtp
+            $date = date
+           
+            createnewlistrecord $mailbox $displayname $primarysmtp $date
+            
+            $selection2 =  Read-host "Mailbox created, click 1 to come back to main menu and 2 to finish the script" 
+            switch ($selection2){
+              
+              '1'{
+              main-menu
+
+              }
+
+              '2' {
+                Disconnect-ExchangeOnline
+                Disconnect-PnPOnline
+
+              }
+
+            }
+
+            
              
          } '2' {
-           Main-Menu
+          Disconnect-ExchangeOnline
+          Disconnect-PnPOnline
          } 
       }
 
