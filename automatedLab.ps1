@@ -1,5 +1,4 @@
-
-
+Import-module AutomatedLab
 function systeminfo {
 
     $ram = Get-WMIObject Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum
@@ -123,7 +122,7 @@ ForEach ($position in $disk) {
 
 }
 
-function createLab {
+function getinfo {
     $labName = Read-Host 'Please provide the name of your lab'
     $labIP = 'Please provide virtual lab subnet '
     $labMask = 'Please provide lab network mask'
@@ -134,23 +133,71 @@ function createLab {
     $passAdmin = Read-Host 'Please provide password of Administrator account' -AsSecureString
     New-LabSourcesFolder -Drive H
     $vmDrive = $driveLetter #for now, add make selection if it should be the same as Lab sources or different
-    $labPath = Join-Path -Path $vmDrive -ChildPath $labName
+    $labPath = Join-Path -Path H: -ChildPath $labName
     if (-not (Test-Path $labPath)) { New-Item $labPath -ItemType Directory | Out-Null }
-
-    New-LabDefinition -Path $labPath -VmPath $labPath -Name $labName -ReferenceDiskSizeInGB 50
-
-    New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV
-    Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace $labIP/$labMask
-    Add-LabDomainDefinition -Name $domainName -AdminUser $nameAdmin-AdminPassword $passAdmin
 
     
 
-
-
 }
 
-  
 
+ function createlab {
+    $labName = 'Test8'
+
+#create an empty lab template and define where the lab XML files and the VMs will be stored
+New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV -VMPath "H:\AutomatedLab-VMs\"
+New-LabSourcesFolder -Drive H
+
+Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace 10.0.1.0/24
+
+
+Set-LabInstallationCredential -Username Install -Password Somepass1
+
+#and the domain definition with the domain admin account
+Add-LabDomainDefinition -Name test2.net -AdminUser Install -AdminPassword Somepass1
+
+$PSDefaultParameterValues = @{
+    'Add-LabMachineDefinition:Network' = $labName
+  
+    'Add-LabMachineDefinition:DnsServer1'= '10.0.1.44'
+    'Add-LabMachineDefinition:DnsServer2'= '10.0.1.46'
+    
+    'Add-LabMachineDefinition:DomainName'= 'test2.net'
+}
+
+
+
+Add-LabMachineDefinition -Name DC1 -Memory 1GB -Network $labName -DomainName test2.net -Roles RootDC `
+     -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.44 
+
+     #Add-LabMachineDefinition -Name DC2 -Memory 1GB -Network $labName -DomainName test2.net -Roles FirstChildDC `
+     #-OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.46
+
+
+Add-LabMachineDefinition -Name WINSQL -Memory 4GB -Network $labName -DomainName test2.net -Roles SQLServer2019 `
+     -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.48
+
+     Add-LabMachineDefinition -Name Client -Memory 2GB -Network $labName -DomainName test2.net -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.50
+
+Install-Lab
+
+Show-LabDeploymentSummary -Detailed
+
+ }
+
+ function deletelab {
+
+    get-lab -List
+            $labname = read-host "Please provide the name of lab you want to delete or press q to come back to main menu"
+
+            if ($labname -eq 'q') {
+                main-menu
+
+            }else {
+
+                remove-lab $labname 
+ }
+}
 function main-menu {
     param (
         [Parameter(Mandatory=$false)]
@@ -163,8 +210,10 @@ function main-menu {
     #add new menu entry, adjust switches + functions below menu section
 Write-Host "================== $Title ==================="  -BackgroundColor DarkGreen    
 Write-Host "1: Check device comptilibity"
-Write-Host "2: Lab options"
-
+Write-Host "2: Create new lab"
+Write-Host "3. Manage lab "
+Write-Host "4. Delete lab "
+Write-Host "5.Update module Automatedlab"
 
 $selection = Read-Host "Please make a selection"
      switch ($selection)
@@ -180,9 +229,25 @@ $selection = Read-Host "Please make a selection"
             
             
          } '2' {
-            Write-host "1. Create lab"
             
+            
+            createlab
+            Read-host " Lab created press any key to return to main menu"
+            main-menu
          } 
+         '3'{
+
+
+         }
+         '4'{
+            deletelab
+            }
+         
+         '5' {
+
+            update-module Automatedlab
+         }
+
       }
 
 
