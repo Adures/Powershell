@@ -1,4 +1,10 @@
+
 Import-module AutomatedLab
+
+
+
+
+
 function systeminfo {
 
     $ram = Get-WMIObject Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum
@@ -142,7 +148,7 @@ function getinfo {
 
 
  function createlab {
-    $labName = 'Test8'
+    $labName = 'LabTemplate'
 
 #create an empty lab template and define where the lab XML files and the VMs will be stored
 New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV -VMPath "H:\AutomatedLab-VMs\"
@@ -165,25 +171,35 @@ $PSDefaultParameterValues = @{
     'Add-LabMachineDefinition:DomainName'= 'test2.net'
 }
 
+    #New-LWHypervVM -Machine Kali 
+    #Add-LWVMVHDX -VMName Kali -VhdxPath D:\SomeFile.vhdx
 
+Add-LabMachineDefinition -Name RDC1 -Memory 1GB -Network $labName -DomainName test2.net -Roles RootDC `
+     -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress 10.0.1.44 
 
-Add-LabMachineDefinition -Name DC1 -Memory 1GB -Network $labName -DomainName test2.net -Roles RootDC `
-     -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.44 
-
-     #Add-LabMachineDefinition -Name DC2 -Memory 1GB -Network $labName -DomainName test2.net -Roles FirstChildDC `
-     #-OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.46
+     Add-LabMachineDefinition -Name RDC2 -Memory 1GB -Network $labName -DomainName test2.net -Roles DC `
+     -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress 10.0.1.46
 
 
 Add-LabMachineDefinition -Name WINSQL -Memory 4GB -Network $labName -DomainName test2.net -Roles SQLServer2019 `
-     -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.48
+     -OperatingSystem 'Windows Server 2019 Standard Evaluation (Desktop Experience)' -IpAddress 10.0.1.48
 
-     Add-LabMachineDefinition -Name Client -Memory 2GB -Network $labName -DomainName test2.net -OperatingSystem 'Windows Server 2016 Standard Evaluation' -IpAddress 10.0.1.50
 
-Install-Lab
+    
+     Add-LabMachineDefinition -Name WinClient -Memory 2GB -Network $labName -DomainName test2.net -OperatingSystem 'Windows 10 Enterprise Evaluation' -IpAddress 10.0.1.50
+
+Install-Lab -Verbose
 
 Show-LabDeploymentSummary -Detailed
 
  }
+
+ function CreateKaliLinuxVM {
+
+    Import-VM -Path 'H:\KaliExport\KaliLinux\Virtual Machines\9EBF720B-2926-47FD-955F-D324F2CF6F57.vmcx' -Copy -GenerateNewId
+    Write-host "Kali Linux VM created"
+ }
+
 
  function deletelab {
 
@@ -196,8 +212,15 @@ Show-LabDeploymentSummary -Detailed
             }else {
 
                 remove-lab $labname 
+                main-menu
  }
 }
+
+
+
+    
+
+
 function main-menu {
     param (
         [Parameter(Mandatory=$false)]
@@ -232,6 +255,8 @@ $selection = Read-Host "Please make a selection"
             
             
             createlab
+            CreateKaliLinuxVM
+            Write-host "Kali Linux VM created"
             Read-host " Lab created press any key to return to main menu"
             main-menu
          } 
