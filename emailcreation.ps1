@@ -21,7 +21,7 @@ if (Test-Path $path) {
 
 
 function createmailbox ($mailbox, $displayname, $primarysmtp) {
-  $adrian = "adrian.stefaniak@lagit.pl"
+  $adrian = "email"
   
 
   New-Mailbox -Name $mailbox -displayname $displayname -Shared -PrimarySmtpAddress $primarysmtp
