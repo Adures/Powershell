@@ -138,7 +138,7 @@ function getinfo {
     $nameAdmin = Read-Host 'Please provide username of Administrator account'
     $passAdmin = Read-Host 'Please provide password of Administrator account' -AsSecureString
     New-LabSourcesFolder -Drive H
-    $vmDrive = $driveLetter #for now, add make selection if it should be the same as Lab sources or different
+    $vmDrive = $driveLetter 
     $labPath = Join-Path -Path H: -ChildPath $labName
     if (-not (Test-Path $labPath)) { New-Item $labPath -ItemType Directory | Out-Null }
 
@@ -147,47 +147,45 @@ function getinfo {
 }
 
 
- function createlab ($labnameProvided, $driveletterProvided, $addressspaceProvided, $domainnameProvided, $defaultgatewayProvided, $rdc1Provided, $rdc2Provided, $winsqlProvided, $winclientProvided) {
+ function createlab ($labnameProvided, $driveletterProvided, $addressspaceProvided, $domainnameProvided, $defaultgatewayProvided, $rdc1Provided, $rdc2Provided, $winsqlProvided, $winclientProvided, $adminUsernameProvided, $adminPasswordProvided) {
     $labName = $labnameProvided
-    $automatedlabfolder = ":\AutomatedLab-CMs\"
+    $automatedlabfolder = ":\AutomatedLab-VMs\"
     $vmPath = $driveletterProvided + $automatedlabfolder
 #create an empty lab template and define where the lab XML files and the VMs will be stored
-New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV -VMPath "H:\AutomatedLab-VMs\"
+New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV -VMPath $vmPath
 New-LabSourcesFolder -Drive $driveletterProvided
+$vEthernet = "vEthernet ($labnameprovided)"
 
-Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace 10.0.1.0/24 -HyperVProperties @{SwitchType = 'External'; AdapterName = 'Ethernet'}
+Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace $addressspaceProvided
 
-
-Set-LabInstallationCredential -Username Install -Password Somepass1
+Set-LabInstallationCredential -Username $adminUsernameProvided -Password $adminPasswordProvided
 
 #and the domain definition with the domain admin account
-Add-LabDomainDefinition -Name test2.net -AdminUser Install -AdminPassword Somepass1
+Add-LabDomainDefinition -Name $domainnameProvided -AdminUser $adminUsernameProvided -AdminPassword $adminPasswordProvided
 
 $PSDefaultParameterValues = @{
     'Add-LabMachineDefinition:Network' = $labName
-  
-    'Add-LabMachineDefinition:DnsServer1'= '10.0.1.44'
-    'Add-LabMachineDefinition:DnsServer2'= '10.0.1.46'
+    'Add-LabMachineDefinition:Gateway'= $defaultgatewayProvided
+    'Add-LabMachineDefinition:DnsServer1'= $rdc1Provided
+    'Add-LabMachineDefinition:DnsServer2'= $rdc2Provided
     
-    'Add-LabMachineDefinition:DomainName'= 'test2.net'
+    'Add-LabMachineDefinition:DomainName'= $domainnameProvided
+
 }
 
     #New-LWHypervVM -Machine Kali 
     #Add-LWVMVHDX -VMName Kali -VhdxPath D:\SomeFile.vhdx
 
-Add-LabMachineDefinition -Name RDC1 -Memory 1GB -Network $labName -DomainName test2.net -Roles RootDC `
-     -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress 10.0.1.44 
+Add-LabMachineDefinition -Name RDC1 -Memory 1GB -Network $labName -Roles RootDC -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress $rdc1Provided 
 
-     Add-LabMachineDefinition -Name RDC2 -Memory 1GB -Network $labName -DomainName test2.net -Roles DC `
-     -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress 10.0.1.46
+     Add-LabMachineDefinition -Name RDC2 -Memory 1GB -Network $labName -Roles DC -OperatingSystem 'Windows Server 2019 Standard Evaluation' -IpAddress $rdc2Provided
 
 
-Add-LabMachineDefinition -Name WINSQL -Memory 4GB -Network $labName -DomainName test2.net -Roles SQLServer2019 `
-     -OperatingSystem 'Windows Server 2019 Standard Evaluation (Desktop Experience)' -IpAddress 10.0.1.48
+Add-LabMachineDefinition -Name WINSQL -Memory 4GB -Network $labName -Roles SQLServer2019 -OperatingSystem 'Windows Server 2019 Standard Evaluation (Desktop Experience)' -IpAddress $winsqlProvided -Processors 4
 
 
     
-     Add-LabMachineDefinition -Name WinClient -Memory 2GB -Network $labName -DomainName test2.net -OperatingSystem 'Windows 10 Enterprise Evaluation' -IpAddress 10.0.1.50
+     Add-LabMachineDefinition -Name WinClient -Memory 2GB -Network $labName -OperatingSystem 'Windows 10 Enterprise Evaluation' -IpAddress $winclientProvided -Processors 4
 
 Install-Lab -Verbose
 
@@ -224,7 +222,11 @@ function importLab {
             import-lab -name $labToStart
 }
 
- 
+function setDNSforwarder {
+
+    Invoke-LabCommand -ScriptBlock { Set-DnsServerForwarder -IPAddress "1.1.1.1" -PassThru } -ComputerName RDC1 -PassThru
+    Invoke-LabCommand -ScriptBlock { Set-DnsServerForwarder -IPAddress "1.1.1.1" -PassThru } -ComputerName RDC2 -PassThru
+}
 
 
 function main-menu {
@@ -260,15 +262,18 @@ $selection = Read-Host "Please make a selection"
          } '2' {
             
             $labnameProvided = read-host "Please provide the name of the lab"
-            $driveletterProvided = read-host "Please priovide letter for labsource and labpath"
-            $addressspaceProvided = read-host " Please provde address space for the lab, example: 10.0.1.0/24"
-            $domainnameProvided = read-host " Please provide the name of domain, example example.net"
-            $defaultgatewayProvided = read-host "Pleae provide the ip address of defaultgateway"
+            $driveletterProvided = read-host "Please provide letter for folder with lab sources and lab VMs"
+            $addressspaceProvided = read-host "Please provide address space for the lab, example: 10.0.1.0/24"
+            $domainnameProvided = read-host "Please provide the name of domain, example example.net"
+            $defaultgatewayProvided = read-host "Please provide the ip address of defaultgateway"
             $rdc1Provided = read-host "Please provide IP address of root domain controller"
             $rdc2Provided = read-host "Please provide IP address of child domain controller"
-            $winsqlProvided = read-host "Pleae provide IP address of sql server"
-            $winclientProvided = read-host " Please provide IP address of windows client"
-            createlab $labnameProvided $driveletterProvided $addressspaceProvided $domainnameProvided $defaultgatewayProvided $rdc1Provided $rdc2Provided $winsqlProvided $winclientProvided
+            $winsqlProvided = read-host "Please provide IP address of sql server"
+            $winclientProvided = read-host "Please provide IP address of windows client"
+            $adminUsernameProvided = read-host "Please provide admin username, this account will be used as a domain admin account for this environment"
+            $adminPasswordProvided  =Read-Host "Please provide password of domain admin account" -AsSecureString
+            createlab $labnameProvided $driveletterProvided $addressspaceProvided $domainnameProvided $defaultgatewayProvided $rdc1Provided $rdc2Provided $winsqlProvided $winclientProvided $adminUsernameProvided $adminPasswordProvided
+            setDNSforwarder
             CreateKaliLinuxVM
             Write-host "Kali Linux VM created"
             Read-host " Lab created press any key to return to main menu"
