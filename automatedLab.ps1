@@ -3,7 +3,7 @@ Import-module AutomatedLab
 
 
 
-
+$Global:Isrunning = 0
 
 function systeminfo {
 
@@ -147,14 +147,15 @@ function getinfo {
 }
 
 
- function createlab {
-    $labName = 'LabTemplate'
-
+ function createlab ($labnameProvided, $driveletterProvided, $addressspaceProvided, $domainnameProvided, $defaultgatewayProvided, $rdc1Provided, $rdc2Provided, $winsqlProvided, $winclientProvided) {
+    $labName = $labnameProvided
+    $automatedlabfolder = ":\AutomatedLab-CMs\"
+    $vmPath = $driveletterProvided + $automatedlabfolder
 #create an empty lab template and define where the lab XML files and the VMs will be stored
 New-LabDefinition -Name $labName -DefaultVirtualizationEngine HyperV -VMPath "H:\AutomatedLab-VMs\"
-New-LabSourcesFolder -Drive H
+New-LabSourcesFolder -Drive $driveletterProvided
 
-Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace 10.0.1.0/24
+Add-LabVirtualNetworkDefinition -Name $labName -AddressSpace 10.0.1.0/24 -HyperVProperties @{SwitchType = 'External'; AdapterName = 'Ethernet'}
 
 
 Set-LabInstallationCredential -Username Install -Password Somepass1
@@ -197,7 +198,7 @@ Show-LabDeploymentSummary -Detailed
  function CreateKaliLinuxVM {
 
     Import-VM -Path 'H:\KaliExport\KaliLinux\Virtual Machines\9EBF720B-2926-47FD-955F-D324F2CF6F57.vmcx' -Copy -GenerateNewId
-    Write-host "Kali Linux VM created"
+    Write-host "Kali Linux VM imported"
  }
 
 
@@ -216,9 +217,14 @@ Show-LabDeploymentSummary -Detailed
  }
 }
 
+function importLab {
 
+            get-lab -List
+            $labToStart = Read-Host "Which lab do you want to import"
+            import-lab -name $labToStart
+}
 
-    
+ 
 
 
 function main-menu {
@@ -253,14 +259,38 @@ $selection = Read-Host "Please make a selection"
             
          } '2' {
             
-            
-            createlab
+            $labnameProvided = read-host "Please provide the name of the lab"
+            $driveletterProvided = read-host "Please priovide letter for labsource and labpath"
+            $addressspaceProvided = read-host " Please provde address space for the lab, example: 10.0.1.0/24"
+            $domainnameProvided = read-host " Please provide the name of domain, example example.net"
+            $defaultgatewayProvided = read-host "Pleae provide the ip address of defaultgateway"
+            $rdc1Provided = read-host "Please provide IP address of root domain controller"
+            $rdc2Provided = read-host "Please provide IP address of child domain controller"
+            $winsqlProvided = read-host "Pleae provide IP address of sql server"
+            $winclientProvided = read-host " Please provide IP address of windows client"
+            createlab $labnameProvided $driveletterProvided $addressspaceProvided $domainnameProvided $defaultgatewayProvided $rdc1Provided $rdc2Provided $winsqlProvided $winclientProvided
             CreateKaliLinuxVM
             Write-host "Kali Linux VM created"
             Read-host " Lab created press any key to return to main menu"
             main-menu
          } 
          '3'{
+            
+            if ($Global:Isrunning -eq 0) {
+
+            importLab
+            $Global:Isrunning = 1
+            
+            
+        }else {
+            Write-host "Create Snapshot"
+        
+            
+            
+            
+           
+
+        }
 
 
          }
